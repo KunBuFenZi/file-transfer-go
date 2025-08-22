@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useRef, useCallback } from 'react';
 import { getWsUrl } from '@/lib/config';
 import { useWebRTCStore } from './webRTCStore';
 
@@ -78,6 +78,7 @@ export function useSharedWebRTCManager(): WebRTCConnection {
 
   // STUN 服务器配置 - 使用更稳定的服务器
   const STUN_SERVERS = [
+    { urls: 'stun:stun.miwifi.com:3478' },
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
