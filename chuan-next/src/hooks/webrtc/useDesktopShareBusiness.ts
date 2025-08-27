@@ -30,10 +30,13 @@ export function useDesktopShareBusiness() {
   }, []);
 
 
-  // 设置远程轨道处理器（始终监听）
+  // 设置远程轨道处理器（组件挂载时设置一次）
   useEffect(() => {
+    let isSubscribed = true;
     console.log('[DesktopShare] 🎧 设置远程轨道处理器');
-    webRTC.onTrack((event: RTCTrackEvent) => {
+    
+    const handleTrack = (event: RTCTrackEvent) => {
+      if (!isSubscribed) return;
       console.log('[DesktopShare] 🎥 收到远程轨道:', event.track.kind, event.track.id);
       console.log('[DesktopShare] 远程流数量:', event.streams.length);
       
@@ -44,18 +47,22 @@ export function useDesktopShareBusiness() {
           console.log('[DesktopShare] 远程轨道:', track.kind, track.id, track.enabled, track.readyState);
         });
         
-        // 直接更新状态，避免依赖handleRemoteStream
         setState(prev => ({ ...prev, remoteStream }));
         
-        // 如果有视频元素引用，设置流
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = remoteStream;
         }
       } else {
         console.warn('[DesktopShare] ⚠️ 收到轨道但没有关联的流');
       }
-    });
-  }, []); // 移除依赖，只在组件挂载时设置一次
+    };
+    
+    webRTC.onTrack(handleTrack);
+    
+    return () => {
+      isSubscribed = false;
+    };
+  }, []); // 只在挂载时执行一次
 
   // 获取桌面共享流
   const getDesktopStream = useCallback(async (): Promise<MediaStream> => {
