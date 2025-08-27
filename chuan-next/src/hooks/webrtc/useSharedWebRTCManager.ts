@@ -82,26 +82,15 @@ export function useSharedWebRTCManager(): WebRTCConnection {
   const messageHandlers = useRef<Map<string, MessageHandler>>(new Map());
   const dataHandlers = useRef<Map<string, DataHandler>>(new Map());
 
-  // ICE 服务器配置 - 修复TURN服务器格式
+  // ICE 服务器配置 - 完全匹配测试页面的成功配置
   const STUN_SERVERS = [
     // STUN服务器 - 用于NAT穿透
     { urls: ['stun:stun.kjtec.cn:3478'] },
     { urls: ['stun:stun.miwifi.com:3478'] },
     
-    // TURN服务器 - 用于中继传输（关键修复：urls使用数组格式）
+    // TURN服务器 - 完全复制测试页面的成功配置
     {
-      urls: ['turn:stun.kjtec.cn:3478'],
-      username: 'kjxtec',
-      credential: 'Asdkjx173'
-    },
-    // 添加UDP和TCP协议的TURN服务器
-    {
-      urls: ['turn:stun.kjtec.cn:3478?transport=udp'],
-      username: 'kjxtec', 
-      credential: 'Asdkjx173'
-    },
-    {
-      urls: ['turn:stun.kjtec.cn:3478?transport=tcp'],
+      urls: ['turn:stun.kjtec.cn:3478'],  // 测试页面验证成功的配置
       username: 'kjxtec',
       credential: 'Asdkjx173'
     }
@@ -242,10 +231,11 @@ export function useSharedWebRTCManager(): WebRTCConnection {
 
     try {
       console.log('[SharedWebRTC] 🔧 创建PeerConnection...');
-      // 创建 PeerConnection
+      // 创建 PeerConnection - 正常ICE流程（先尝试直连，失败后使用TURN）
       const pc = new RTCPeerConnection({
         iceServers: STUN_SERVERS,
         iceCandidatePoolSize: 10,
+        // 移除iceTransportPolicy，使用默认的"all"策略，允许所有连接类型
       });
       pcRef.current = pc;
 
@@ -404,14 +394,27 @@ export function useSharedWebRTCManager(): WebRTCConnection {
         }
       };
 
-      // PeerConnection 事件处理
+      // PeerConnection 事件处理 - 增加详细的ICE候选类型检查
       pc.onicecandidate = (event) => {
         if (event.candidate && ws.readyState === WebSocket.OPEN) {
+          const candidate = event.candidate.candidate;
+          
+          // 详细记录ICE候选类型（像测试页面一样）
+          if (candidate.includes('typ relay')) {
+            console.log('[SharedWebRTC] 🎯 发现TURN relay候选:', candidate);
+          } else if (candidate.includes('typ srflx')) {
+            console.log('[SharedWebRTC] 🌐 发现STUN srflx候选:', candidate);
+          } else if (candidate.includes('typ host')) {
+            console.log('[SharedWebRTC] 🏠 发现host候选:', candidate);
+          } else {
+            console.log('[SharedWebRTC] ❓ 未知类型ICE候选:', candidate);
+          }
+          
           ws.send(JSON.stringify({
             type: 'ice-candidate',
             payload: event.candidate
           }));
-          console.log('[SharedWebRTC] 📤 发送 ICE 候选:', event.candidate.candidate.substring(0, 50) + '...');
+          console.log('[SharedWebRTC] 📤 发送 ICE 候选:', candidate.substring(0, 80) + '...');
         } else if (!event.candidate) {
           console.log('[SharedWebRTC] 🏁 ICE 收集完成');
         }
