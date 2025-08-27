@@ -82,14 +82,29 @@ export function useSharedWebRTCManager(): WebRTCConnection {
   const messageHandlers = useRef<Map<string, MessageHandler>>(new Map());
   const dataHandlers = useRef<Map<string, DataHandler>>(new Map());
 
-  // STUN 服务器配置 - 使用更稳定的服务器
+  // ICE 服务器配置 - 包含STUN和TURN服务器
   const STUN_SERVERS = [
+    // STUN服务器 - 用于NAT穿透
     { urls: 'stun:stun.kjtec.cn:3478' },
+    { urls: 'stun:stun.l.google.com:19302' },
+    
+    // TURN服务器 - 用于中继传输（备用方案）
     {
       urls: 'turn:stun.kjtec.cn:3478',
       username: 'kjxtec',
       credential: 'Asdkjx173'
     },
+    // 添加UDP和TCP协议的TURN服务器
+    {
+      urls: 'turn:stun.kjtec.cn:3478?transport=udp',
+      username: 'kjxtec', 
+      credential: 'Asdkjx173'
+    },
+    {
+      urls: 'turn:stun.kjtec.cn:3478?transport=tcp',
+      username: 'kjxtec',
+      credential: 'Asdkjx173'
+    }
   ];
 
   const updateState = useCallback((updates: Partial<WebRTCState>) => {
