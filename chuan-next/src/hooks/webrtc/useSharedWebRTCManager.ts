@@ -612,6 +612,9 @@ export function useSharedWebRTCManager(): WebRTCConnection {
         // 这里不处理，让具体的业务逻辑处理
         // onTrack会被业务逻辑重新设置
       };
+      
+      // 通知业务逻辑PeerConnection已准备就绪
+      console.log('[SharedWebRTC] ✅ PeerConnection创建完成，准备接收onTrack设置');
 
     } catch (error) {
       console.error('[SharedWebRTC] 连接失败:', error);
