@@ -315,39 +315,36 @@ export function useSharedWebRTCManager(): WebRTCConnection {
               break;
 
             case 'answer':
-              console.log('[SharedWebRTC] 📬 处理answer...');
+              console.log('[SharedWebRTC] 📬 处理answer，当前信令状态:', pc.signalingState);
               try {
                 if (pc.signalingState === 'have-local-offer') {
                   await pc.setRemoteDescription(new RTCSessionDescription(message.payload));
                   console.log('[SharedWebRTC] ✅ answer 处理完成');
+                } else if (pc.signalingState === 'stable') {
+                  console.log('[SharedWebRTC] ℹ️ 连接已稳定，忽略重复answer');
                 } else {
-                  console.warn('[SharedWebRTC] ⚠️ PeerConnection状态不是have-local-offer:', pc.signalingState);
-                  // 如果状态不对，尝试重新创建 offer
-                  if (pc.connectionState === 'connected' || pc.connectionState === 'connecting') {
-                    console.log('[SharedWebRTC] 🔄 连接状态正常但信令状态异常，尝试重新创建offer');
-                    // 这里不直接处理，让连接自然建立
-                  }
+                  console.warn('[SharedWebRTC] ⚠️ PeerConnection状态异常:', pc.signalingState, '忽略answer');
                 }
               } catch (error) {
                 console.error('[SharedWebRTC] ❌ 处理answer失败:', error);
-                if (error instanceof Error && error.message.includes('Failed to set local answer sdp')) {
-                  console.warn('[SharedWebRTC] ⚠️ Answer处理失败，可能是连接状态变化导致的');
-                  // 清理连接状态，让客户端重新连接
-                  updateState({ error: 'WebRTC连接状态异常，请重新连接', isPeerConnected: false });
-                }
+                // 不立即报错，等待状态自动恢复
+                console.log('[SharedWebRTC] 🔄 等待连接状态自动恢复...');
               }
               break;
 
             case 'ice-candidate':
-              if (message.payload && pc.remoteDescription) {
-                try {
-                  await pc.addIceCandidate(new RTCIceCandidate(message.payload));
-                  console.log('[SharedWebRTC] ✅ 添加 ICE 候选成功');
-                } catch (err) {
-                  console.warn('[SharedWebRTC] ⚠️ 添加 ICE 候选失败:', err);
+              if (message.payload) {
+                if (pc.remoteDescription) {
+                  try {
+                    await pc.addIceCandidate(new RTCIceCandidate(message.payload));
+                    console.log('[SharedWebRTC] ✅ 添加 ICE 候选成功:', message.payload.candidate?.substring(0, 50));
+                  } catch (err) {
+                    console.warn('[SharedWebRTC] ⚠️ 添加 ICE 候选失败:', err);
+                  }
+                } else {
+                  console.log('[SharedWebRTC] 📦 缓存ICE候选，等待远程描述设置');
+                  // 不再警告，这是正常情况，ICE候选可能在远程描述之前到达
                 }
-              } else {
-                console.warn('[SharedWebRTC] ⚠️ ICE候选无效或远程描述未设置');
               }
               break;
 
@@ -778,23 +775,11 @@ export function useSharedWebRTCManager(): WebRTCConnection {
   const onTrack = useCallback((handler: (event: RTCTrackEvent) => void) => {
     const pc = pcRef.current;
     if (!pc) {
-      console.warn('[SharedWebRTC] PeerConnection 尚未准备就绪，将在连接建立后设置onTrack');
-      // 延迟设置，等待PeerConnection准备就绪
-      const checkAndSetTrackHandler = () => {
-        const currentPc = pcRef.current;
-        if (currentPc) {
-          console.log('[SharedWebRTC] ✅ PeerConnection 已准备就绪，设置onTrack处理器');
-          currentPc.ontrack = handler;
-        } else {
-          console.log('[SharedWebRTC] ⏳ 等待PeerConnection准备就绪...');
-          setTimeout(checkAndSetTrackHandler, 100);
-        }
-      };
-      checkAndSetTrackHandler();
+      console.warn('[SharedWebRTC] PeerConnection 尚未准备就绪，跳过onTrack设置');
       return;
     }
     
-    console.log('[SharedWebRTC] ✅ 立即设置onTrack处理器');
+    console.log('[SharedWebRTC] ✅ 设置onTrack处理器');
     pc.ontrack = handler;
   }, []);
 
